@@ -10,6 +10,18 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173") // Allow your frontend origin
+              .AllowAnyHeader()                    // Allow any headers
+              .AllowAnyMethod()                    // Allow any HTTP methods (GET, POST, etc.)
+              .AllowCredentials();                 // Allow credentials (e.g., cookies, Authorization headers) if needed
+    });
+});
+
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -23,11 +35,15 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddSingleton<IWebHostEnvironment>(builder.Environment);
 
-
 builder.Services.AddHttpClient<IOcrService, OcrService>(client =>
 {
     client.BaseAddress = new Uri("http://127.0.0.1:8000/");
 });
+builder.Services.AddHttpClient<ILlmService, LlmService>(client =>
+{
+    client.BaseAddress = new Uri("http://127.0.0.1:8001/"); // LLM microservice
+});
+
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
 {
@@ -61,6 +77,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Enable CORS middleware
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();

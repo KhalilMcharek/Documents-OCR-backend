@@ -86,6 +86,27 @@ namespace Documents_OCR_back.Controllers
             await _documentService.DeleteDocument(id); 
             return Ok(new { message = "Document supprimé avec succès" });
         }
-
+        [HttpPost("correct/{id}")]
+        public async Task<IActionResult> CorrectTextFromDocument(int id)
+        {
+            try
+            {
+                var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? throw new UnauthorizedAccessException("Utilisateur non authentifié."));
+                var (correctedText, suggestions) = await _documentService.CorrectTextFromDocument(id, userId);
+                return Ok(new { correctedText, suggestions });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Erreur lors de la correction du texte", error = ex.Message });
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Documents_OCR_back.Services;
+using Documents_OCR_back.Models.DTOs;
 
 namespace Documents_OCR_back.Services
 {
@@ -21,7 +22,8 @@ namespace Documents_OCR_back.Services
             if (!response.IsSuccessStatusCode)
                 throw new Exception("Erreur lors de l'appel OCR");
 
-            return await response.Content.ReadAsStringAsync();
+            var jsonResponse = await response.Content.ReadFromJsonAsync<OcrResponse>();
+            return jsonResponse?.Text ?? throw new Exception("Invalid OCR response format");
         }
 
     }

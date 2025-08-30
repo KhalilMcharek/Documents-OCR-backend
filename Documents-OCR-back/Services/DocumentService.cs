@@ -2,6 +2,7 @@
 using Documents_OCR_back.Models.Entities;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 namespace Documents_OCR_back.Services
 
 {
@@ -10,12 +11,15 @@ namespace Documents_OCR_back.Services
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly IOcrService _ocrService;
-
-        public DocumentService(ApplicationDbContext context, IWebHostEnvironment env, IOcrService ocrService)
+        private readonly ILlmService _llmService;
+        private readonly IConfiguration _configuration;
+        public DocumentService(ApplicationDbContext context, IWebHostEnvironment env, ILlmService llmService, IOcrService ocrService, IConfiguration configuration)
         {
             _context = context;
             _env = env;
             _ocrService = ocrService;
+            _llmService = llmService;
+            _configuration = configuration;
         }
 
 
@@ -41,6 +45,7 @@ namespace Documents_OCR_back.Services
                 FileName = fileName,
                 TextExtracted = "",
                 CorrectedText = "",
+                SuggestionsJson = "",
                 UserId = userId,
                 UploadedAt = DateTime.UtcNow
             };
@@ -99,7 +104,24 @@ namespace Documents_OCR_back.Services
             return extractedText;
         }
 
+        public async Task<(string CorrectedText, Dictionary<string, List<string>> Suggestions)> CorrectTextFromDocument(int documentId, int userId)
+        {
+            var document = await _context.Documents.FindAsync(documentId);
+            if (document == null || document.UserId != userId)
+                throw new UnauthorizedAccessException("Document non trouvé ou accès non autorisé.");
 
+            if (string.IsNullOrEmpty(document.TextExtracted))
+                throw new ArgumentException("Aucun texte extrait disponible pour correction.");
+
+            var (correctedText, suggestions) = await _llmService.CorrectTextAsync(document.TextExtracted);
+            document.CorrectedText = string.IsNullOrWhiteSpace(correctedText) ? "(aucune correction)" : correctedText;
+            document.SuggestionsJson = JsonSerializer.Serialize(suggestions ?? new());
+
+            _context.Documents.Update(document);
+            await _context.SaveChangesAsync();
+
+            return (correctedText, suggestions);
+        }
 
     }
 }
